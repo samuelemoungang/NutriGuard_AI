@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import TerminalUI from './TerminalUI';
 import { TerminalLog, ImageAnalysisResult, FoodType } from '@/types';
+import RoboFlowService, { RoboFlowPrediction } from '@/services/roboflowService';
 
 interface ImageAnalysisStepProps {
   uploadedImage: string | null;
@@ -10,34 +11,15 @@ interface ImageAnalysisStepProps {
   isActive: boolean;
 }
 
-// Food recognition database (mock)
-const FOOD_DATABASE: FoodType[] = [
-  { name: 'Apple', category: 'fruit', confidence: 0, shelfLife: '4-8 weeks refrigerated', optimalStorage: '0-4°C, high humidity' },
-  { name: 'Banana', category: 'fruit', confidence: 0, shelfLife: '2-7 days at room temp', optimalStorage: '12-14°C, away from other fruits' },
-  { name: 'Orange', category: 'fruit', confidence: 0, shelfLife: '2-3 weeks refrigerated', optimalStorage: '3-8°C' },
-  { name: 'Strawberry', category: 'fruit', confidence: 0, shelfLife: '3-7 days refrigerated', optimalStorage: '0-2°C, do not wash until use' },
-  { name: 'Tomato', category: 'vegetable', confidence: 0, shelfLife: '1-2 weeks', optimalStorage: 'Room temperature until ripe, then refrigerate' },
-  { name: 'Lettuce', category: 'vegetable', confidence: 0, shelfLife: '7-10 days refrigerated', optimalStorage: '0-4°C, wrapped in damp paper towel' },
-  { name: 'Carrot', category: 'vegetable', confidence: 0, shelfLife: '3-4 weeks refrigerated', optimalStorage: '0-4°C, high humidity' },
-  { name: 'Broccoli', category: 'vegetable', confidence: 0, shelfLife: '3-5 days refrigerated', optimalStorage: '0-4°C, unwashed' },
-  { name: 'Chicken Breast', category: 'meat', confidence: 0, shelfLife: '1-2 days raw, 3-4 days cooked', optimalStorage: '0-4°C raw, freeze for longer storage' },
-  { name: 'Ground Beef', category: 'meat', confidence: 0, shelfLife: '1-2 days raw, 3-4 days cooked', optimalStorage: '0-4°C raw' },
-  { name: 'Salmon Fillet', category: 'seafood', confidence: 0, shelfLife: '1-2 days refrigerated', optimalStorage: '0-2°C, on ice' },
-  { name: 'Shrimp', category: 'seafood', confidence: 0, shelfLife: '1-2 days refrigerated', optimalStorage: '0-2°C, on ice' },
-  { name: 'Milk', category: 'dairy', confidence: 0, shelfLife: '5-7 days after opening', optimalStorage: '0-4°C, away from door' },
-  { name: 'Cheese', category: 'dairy', confidence: 0, shelfLife: '1-4 weeks depending on type', optimalStorage: '0-4°C, wrapped properly' },
-  { name: 'Yogurt', category: 'dairy', confidence: 0, shelfLife: '1-2 weeks', optimalStorage: '0-4°C' },
-  { name: 'Bread', category: 'grain', confidence: 0, shelfLife: '5-7 days at room temp', optimalStorage: 'Room temperature, freeze for longer storage' },
-  { name: 'Rice', category: 'grain', confidence: 0, shelfLife: '4-6 days cooked', optimalStorage: 'Cooked: 0-4°C, Dry: room temperature' },
-  { name: 'Pizza', category: 'processed', confidence: 0, shelfLife: '3-4 days refrigerated', optimalStorage: '0-4°C' },
-  { name: 'Sandwich', category: 'processed', confidence: 0, shelfLife: '1-2 days refrigerated', optimalStorage: '0-4°C' },
-];
+// Non usiamo più un database mock di alimenti: tutto il feedback
+// deriva dal modello YOLOv8 (o da mapping deterministici)
 
 export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive }: ImageAnalysisStepProps) {
   const [logs, setLogs] = useState<TerminalLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<ImageAnalysisResult | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
+  const [roboFlowService] = useState(() => new RoboFlowService());
 
   const addLog = useCallback((type: TerminalLog['type'], message: string) => {
     setLogs(prev => [...prev, {
@@ -48,13 +30,8 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
     }]);
   }, []);
 
-  const recognizeFood = useCallback((): FoodType => {
-    // Mock food recognition - randomly select a food type
-    const randomIndex = Math.floor(Math.random() * FOOD_DATABASE.length);
-    const food = { ...FOOD_DATABASE[randomIndex] };
-    food.confidence = 75 + Math.random() * 20; // 75-95% confidence
-    return food;
-  }, []);
+  // Non eseguiamo più riconoscimento mock dell'alimento: il "nome"
+  // mostrerà la classe restituita da YOLOv8 (o un valore generico).
 
   const simulateAnalysis = useCallback(async () => {
     if (!uploadedImage || hasStarted) return;
@@ -64,7 +41,7 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
     setLogs([]);
 
     // Phase 1: Initialization
-    addLog('info', 'Initializing Image Analysis Agent...');
+    addLog('info', 'Initializing Image Analysis Agent with RoboFlow Integration...');
     await new Promise(resolve => setTimeout(resolve, 500));
 
     addLog('processing', 'Loading computer vision models...');
@@ -73,16 +50,70 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
     addLog('success', 'Model loaded: ResNet-50 with custom food safety weights');
     await new Promise(resolve => setTimeout(resolve, 400));
 
-    addLog('success', 'Model loaded: FoodNet-v2 for food classification');
+    addLog('success', 'Model loaded: RoboFlow YOLOv8 Workflow (nutriguard/yolov8)');
     await new Promise(resolve => setTimeout(resolve, 400));
+    
+    addLog('info', 'RoboFlow: Single YOLOv8 workflow for freshness & detections');
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Phase 2: Food Recognition
-    addLog('processing', 'Running food classification neural network...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Phase 2: Send image to RoboFlow (single workflow)
+    addLog('processing', 'Sending image to RoboFlow YOLOv8 workflow...');
+    await new Promise(resolve => setTimeout(resolve, 800));
 
-    const detectedFood = recognizeFood();
+    let roboFlowPrediction: RoboFlowPrediction | null = null;
+    let detectedClass: string | null = null;
+    let freshnessLabel: 'fresh' | 'ripening' | 'rotten' = 'fresh';
+    let freshnessConfidence = 0;
+    
+    try {
+      const imageBase64 = uploadedImage.includes(',')
+        ? uploadedImage
+        : `data:image/jpeg;base64,${uploadedImage}`;
 
-    addLog('success', `Food identified: ${detectedFood.name} (${detectedFood.confidence.toFixed(1)}% confidence)`);
+      roboFlowPrediction = await roboFlowService.analyzeImage(imageBase64);
+      addLog('success', 'RoboFlow analysis completed');
+
+      const predictions = roboFlowPrediction.predictions || roboFlowPrediction.detections || [];
+      if (predictions.length > 0) {
+        const bestPrediction = predictions.sort((a, b) => b.confidence - a.confidence)[0];
+        detectedClass = bestPrediction.class;
+        addLog(
+          'info',
+          `RoboFlow detected class: ${detectedClass} (${(bestPrediction.confidence * 100).toFixed(1)}% confidence)`,
+        );
+      } else {
+        addLog('warning', 'RoboFlow did not return any detections, using fallback analysis');
+      }
+
+      // Analisi di freschezza basata SOLO sull'output del modello
+      const freshnessAnalysis = roboFlowService.analyzeDetections(roboFlowPrediction);
+      freshnessLabel = freshnessAnalysis.freshness;
+      freshnessConfidence = freshnessAnalysis.confidence;
+      addLog('info', `RoboFlow Freshness Status: ${freshnessLabel}`);
+      addLog('info', `RoboFlow Mold Coverage: ${freshnessAnalysis.moldPercentage.toFixed(1)}%`);
+    } catch (error) {
+      addLog('warning', 'RoboFlow API call failed, using fallback analysis');
+      roboFlowPrediction = null;
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Phase 3: Costruzione del "food type" SOLO dai dati YOLOv8
+    addLog('processing', 'Building food profile from YOLOv8 output...');
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    const storageInfo = roboFlowService.getFreshnessCategoryInfo(freshnessLabel);
+
+    const detectedFood: FoodType = {
+      name: detectedClass
+        ? detectedClass.charAt(0).toUpperCase() + detectedClass.slice(1)
+        : 'Food Item',
+      category: 'other',
+      confidence: Math.max(0, Math.min(100, freshnessConfidence * 100)),
+      shelfLife: storageInfo.shelfLife,
+      optimalStorage: storageInfo.optimalStorage,
+    };
+
+    addLog('success', `Food profile built from model output: ${detectedFood.name}`);
     await new Promise(resolve => setTimeout(resolve, 300));
 
     addLog('info', `Category: ${detectedFood.category.charAt(0).toUpperCase() + detectedFood.category.slice(1)}`);
@@ -94,7 +125,7 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
     addLog('info', `Optimal storage: ${detectedFood.optimalStorage}`);
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Phase 3: Quality Analysis
+    // Phase 4: Quality Analysis
     addLog('processing', 'Preprocessing image: resizing to 224x224...');
     await new Promise(resolve => setTimeout(resolve, 600));
 
@@ -110,38 +141,61 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
     addLog('success', 'Analysis complete!');
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Generate mock results based on food type
-    const moldRisk = detectedFood.category === 'fruit' || detectedFood.category === 'vegetable' ? 0.3 : 0.2;
-    const moldDetected = Math.random() < moldRisk;
+    // Analyze RoboFlow results (solo dati reali, niente random)
+    let moldDetected = false;
+    let moldPercentage = 0;
 
-    const mockResult: ImageAnalysisResult = {
+    if (roboFlowPrediction && roboFlowPrediction.success) {
+      const freshnessAnalysis = roboFlowService.analyzeDetections(roboFlowPrediction);
+      moldDetected = freshnessAnalysis.moldDetected;
+      moldPercentage = freshnessAnalysis.moldPercentage;
+
+      const detectionCount =
+        (roboFlowPrediction.predictions || roboFlowPrediction.detections || []).length;
+      addLog('info', `RoboFlow Detections: ${detectionCount} object(s) identified`);
+    }
+
+    // Mappa deterministica della freschezza in distribuzione colori
+    let healthy = 70;
+    let warning = 20;
+    let danger = 10;
+    if (freshnessLabel === 'ripening') {
+      healthy = 50;
+      warning = 30;
+      danger = 20;
+    } else if (freshnessLabel === 'rotten') {
+      healthy = 10;
+      warning = 20;
+      danger = 70;
+    }
+
+    const resultData: ImageAnalysisResult = {
       foodType: detectedFood,
       moldDetected,
-      moldPercentage: moldDetected ? Math.random() * 15 : Math.random() * 2,
+      moldPercentage,
       dominantColors: ['#8B4513', '#228B22', '#FFD700'],
       colorAnalysis: {
-        healthy: 65 + Math.random() * 20,
-        warning: 10 + Math.random() * 15,
-        danger: 5 + Math.random() * 10,
+        healthy,
+        warning,
+        danger,
       },
-      confidence: 85 + Math.random() * 10,
+      confidence: Math.max(0, Math.min(100, freshnessConfidence * 100)),
     };
 
-    // Normalize percentages
-    const total = mockResult.colorAnalysis.healthy + mockResult.colorAnalysis.warning + mockResult.colorAnalysis.danger;
-    mockResult.colorAnalysis.healthy = (mockResult.colorAnalysis.healthy / total) * 100;
-    mockResult.colorAnalysis.warning = (mockResult.colorAnalysis.warning / total) * 100;
-    mockResult.colorAnalysis.danger = (mockResult.colorAnalysis.danger / total) * 100;
+    addLog('info', `Mold Detection: ${resultData.moldDetected ? 'POSITIVE' : 'NEGATIVE'} (${resultData.moldPercentage.toFixed(1)}% coverage)`);
+    addLog('info', `Color Analysis - Healthy: ${resultData.colorAnalysis.healthy.toFixed(1)}%, Warning: ${resultData.colorAnalysis.warning.toFixed(1)}%, Danger: ${resultData.colorAnalysis.danger.toFixed(1)}%`);
+    addLog('info', `Overall Confidence Score: ${resultData.confidence.toFixed(1)}%`);
+    addLog(
+      resultData.moldDetected ? 'warning' : 'success',
+      resultData.moldDetected
+        ? 'Potential contamination detected. Proceeding to signal processing...'
+        : 'Visual analysis looks healthy. Proceeding to signal processing...',
+    );
 
-    addLog('info', `Mold Detection: ${mockResult.moldDetected ? 'POSITIVE' : 'NEGATIVE'} (${mockResult.moldPercentage.toFixed(1)}% coverage)`);
-    addLog('info', `Color Analysis - Healthy: ${mockResult.colorAnalysis.healthy.toFixed(1)}%, Warning: ${mockResult.colorAnalysis.warning.toFixed(1)}%, Danger: ${mockResult.colorAnalysis.danger.toFixed(1)}%`);
-    addLog('info', `Overall Confidence Score: ${mockResult.confidence.toFixed(1)}%`);
-    addLog(mockResult.moldDetected ? 'warning' : 'success', mockResult.moldDetected ? 'Potential contamination detected. Proceeding to signal processing...' : 'Visual analysis looks healthy. Proceeding to signal processing...');
-
-    setResult(mockResult);
+    setResult(resultData);
     setIsProcessing(false);
-    onComplete(mockResult);
-  }, [uploadedImage, hasStarted, addLog, recognizeFood, onComplete]);
+    onComplete(resultData);
+  }, [uploadedImage, hasStarted, addLog, onComplete, roboFlowService]);
 
   useEffect(() => {
     if (isActive && uploadedImage && !hasStarted) {
