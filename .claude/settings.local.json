@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app:*)",
+      "Bash(powershell -Command \"Copy-Item -Path ''temp-app\\*'' -Destination ''.'' -Recurse -Force; Remove-Item -Path ''temp-app'' -Recurse -Force\")"
+    ]
+  }
+}
