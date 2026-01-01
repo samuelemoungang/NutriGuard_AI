@@ -134,10 +134,10 @@ export default function Home() {
   const flowiseFeedbackUrl = process.env.NEXT_PUBLIC_FLOWISE_FEEDBACK_URL;
 
   return (
-    <main className="relative overflow-hidden">
+    <main className="relative overflow-x-hidden">
       <div
         ref={scrollContainerRef}
-        className="horizontal-scroll-container h-screen"
+        className="horizontal-scroll-container min-h-screen"
       >
         {/* Hero Section - Step 0 */}
         <HeroSection
