@@ -18,21 +18,23 @@ interface ProcessEnv {
   NEXT_PUBLIC_FLOWISE_FEEDBACK_URL?: string;
 
   /**
-   * OpenAI API Key (Opzionale - a pagamento)
-   * Ottenibile da: https://platform.openai.com/api-keys
-   * Formato: stringa che inizia con "sk-"
-   * Esempio: "sk-proj-abc123xyz789"
+   * Roboflow API Key (RICHIESTO)
+   * Ottenibile da: https://app.roboflow.com/settings/api
    */
-  NEXT_PUBLIC_OPENAI_API_KEY?: string;
+  NEXT_PUBLIC_ROBOFLOW_API_KEY?: string;
 
   /**
-   * Hugging Face API Key (Opzionale - per uso illimitato)
-   * Funziona anche senza API key (con limiti)
-   * Ottenibile da: https://huggingface.co/settings/tokens
-   * Formato: stringa che inizia con "hf_"
-   * Esempio: "hf_abc123xyz789"
+   * Roboflow Workflow URL (RICHIESTO)
+   * URL del workflow serverless
+   * Esempio: https://serverless.roboflow.com/nutriguard/workflows/yolov8
    */
-  NEXT_PUBLIC_HUGGINGFACE_API_KEY?: string;
+  NEXT_PUBLIC_ROBOFLOW_WORKFLOW_URL?: string;
+
+  /**
+   * Google Gemini API Key (Opzionale - backup)
+   * Ottenibile da: https://aistudio.google.com/app/apikey
+   */
+  NEXT_PUBLIC_GEMINI_API_KEY?: string;
 }
 
 declare namespace NodeJS {
