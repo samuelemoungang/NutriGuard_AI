@@ -29,12 +29,6 @@ interface ProcessEnv {
    * Esempio: https://serverless.roboflow.com/nutriguard/workflows/yolov8
    */
   NEXT_PUBLIC_ROBOFLOW_WORKFLOW_URL?: string;
-
-  /**
-   * Google Gemini API Key (Opzionale - backup)
-   * Ottenibile da: https://aistudio.google.com/app/apikey
-   */
-  NEXT_PUBLIC_GEMINI_API_KEY?: string;
 }
 
 declare namespace NodeJS {

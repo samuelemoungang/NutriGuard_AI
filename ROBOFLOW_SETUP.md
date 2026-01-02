@@ -1,10 +1,8 @@
 # 🍕 NutriGuard AI - Setup Guide
 
-## Sistema Ibrido: Roboflow + Gemini Vision
+## Roboflow YOLOv8 per il Riconoscimento Alimenti
 
-Il progetto usa un sistema ibrido per l'analisi degli alimenti:
-- **Roboflow YOLOv8** → Riconoscimento del tipo di cibo
-- **Gemini Vision** → Analisi qualità e freschezza
+Il progetto usa **Roboflow Serverless Workflows** con il modello **YOLOv8** per il riconoscimento degli alimenti.
 
 ---
 
@@ -15,28 +13,16 @@ Il progetto usa un sistema ibrido per l'analisi degli alimenti:
 Crea o modifica il file `.env.local` nella root del progetto con queste variabili:
 
 ```env
-# Roboflow Configuration (Food Recognition)
-NEXT_PUBLIC_ROBOFLOW_API_KEY=GnGYmsQUXeSX9tNz0DAS
+# Roboflow Configuration
+NEXT_PUBLIC_ROBOFLOW_API_KEY=your-roboflow-api-key
 NEXT_PUBLIC_ROBOFLOW_WORKFLOW_URL=https://serverless.roboflow.com/nutriguard/workflows/yolov8
-
-# Gemini Configuration (Quality Analysis)
-NEXT_PUBLIC_GEMINI_API_KEY=your-gemini-api-key-here
 ```
-
-### 2. Ottenere Gemini API Key
-
-1. Vai su **https://aistudio.google.com/app/apikey**
-2. Accedi con il tuo account Google
-3. Clicca **"Create API key"**
-4. Copia la chiave (inizia con `AIzaSy...`)
-5. Incollala nel file `.env.local`
 
 ### 2. Riavvia il Server
 
 Dopo aver salvato il file `.env.local`, riavvia il server:
 
 ```bash
-# Ferma il server corrente (Ctrl+C)
 npm run dev
 ```
 
@@ -51,11 +37,11 @@ npm run dev
 
 ---
 
-## 📁 File Modificati
+## 📁 File del Progetto
 
 - `src/services/roboflowWorkflowService.ts` - Servizio Roboflow
 - `src/app/api/roboflow/route.ts` - API Route (evita CORS)
-- `src/components/ImageAnalysisStep.tsx` - Componente aggiornato
+- `src/components/ImageAnalysisStep.tsx` - Componente analisi
 - `src/env.d.ts` - Type declarations
 
 ---
@@ -87,4 +73,3 @@ npm run dev
 ### Nessun rilevamento
 - Il modello potrebbe non riconoscere quel tipo di cibo
 - Prova con un'immagine più chiara
-

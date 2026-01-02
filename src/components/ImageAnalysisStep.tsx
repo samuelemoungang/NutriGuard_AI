@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import TerminalUI from './TerminalUI';
 import { TerminalLog, ImageAnalysisResult } from '@/types';
 import RoboflowWorkflowService from '@/services/roboflowWorkflowService';
-import GeminiQualityService, { QualityAnalysisResult } from '@/services/geminiQualityService';
 
 interface ImageAnalysisStepProps {
   uploadedImage: string | null;
@@ -16,10 +15,8 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
   const [logs, setLogs] = useState<TerminalLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<ImageAnalysisResult | null>(null);
-  const [qualityResult, setQualityResult] = useState<QualityAnalysisResult | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [roboflowService] = useState(() => new RoboflowWorkflowService());
-  const [geminiService] = useState(() => new GeminiQualityService());
 
   const addLog = useCallback((type: TerminalLog['type'], message: string) => {
     setLogs(prev => [...prev, {
@@ -106,73 +103,25 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
       addLog('info', `Shelf Life: ${resultData.foodType.shelfLife}`);
       addLog('info', `Storage: ${resultData.foodType.optimalStorage}`);
 
-      // Phase 4: Gemini Quality Analysis
-      let geminiQuality: QualityAnalysisResult | null = null;
-      
-      if (geminiService.isConfigured()) {
-        addLog('processing', 'Starting Gemini Vision quality analysis...');
-        addLog('info', 'Analyzing freshness, mold, discoloration...');
-        
-        try {
-          geminiQuality = await geminiService.analyzeQuality(imageBase64, roboflowAnalysis.foodName);
-          
-          addLog('success', 'Gemini quality analysis complete!');
-          addLog('info', `Quality: ${geminiQuality.overallQuality.toUpperCase()}`);
-          addLog('info', `Freshness Score: ${geminiQuality.freshnessScore}%`);
-          addLog('info', `Description: ${geminiQuality.description}`);
-          
-          if (geminiQuality.moldDetected) {
-            addLog('error', '⚠️ MOLD DETECTED!');
-          }
-          if (geminiQuality.discoloration) {
-            addLog('warning', '⚠️ Discoloration detected');
-          }
-          if (geminiQuality.issues.length > 0) {
-            addLog('warning', `Issues: ${geminiQuality.issues.join(', ')}`);
-          }
-          if (!geminiQuality.safeToEat) {
-            addLog('error', '🚫 NOT SAFE TO EAT');
-          } else {
-            addLog('success', '✅ Safe to consume');
-          }
-          
-          setQualityResult(geminiQuality);
-        } catch (geminiError) {
-          addLog('warning', `Gemini analysis failed: ${geminiError instanceof Error ? geminiError.message : 'Unknown error'}`);
-          addLog('info', 'Continuing with Roboflow results only...');
-        }
-      } else {
-        addLog('info', 'Gemini not configured - skipping quality analysis');
-        addLog('info', 'Add NEXT_PUBLIC_GEMINI_API_KEY to .env.local for quality analysis');
-      }
-
-      // Phase 5: Final Results
-      addLog('processing', 'Generating final assessment...');
+      // Phase 4: Quality Analysis Summary
+      addLog('processing', 'Generating quality assessment...');
       await new Promise(resolve => setTimeout(resolve, 400));
 
-      // Combine Roboflow + Gemini results
-      const moldDetected = geminiQuality?.moldDetected || resultData.moldDetected;
-      const freshnessScore = geminiQuality?.freshnessScore || (resultData.moldDetected ? 30 : 85);
-      
       const finalResult: ImageAnalysisResult = {
         foodType: resultData.foodType,
-        moldDetected: moldDetected,
-        moldPercentage: moldDetected ? (geminiQuality ? 100 - geminiQuality.freshnessScore : 15) : 0,
+        moldDetected: resultData.moldDetected,
+        moldPercentage: resultData.moldPercentage,
         dominantColors: resultData.dominantColors,
-        colorAnalysis: {
-          healthy: geminiQuality ? geminiQuality.freshnessScore : resultData.colorAnalysis.healthy,
-          warning: geminiQuality ? (geminiQuality.discoloration ? 30 : 10) : resultData.colorAnalysis.warning,
-          danger: geminiQuality ? (geminiQuality.moldDetected ? 40 : 5) : resultData.colorAnalysis.danger,
-        },
+        colorAnalysis: resultData.colorAnalysis,
         confidence: resultData.confidence,
       };
 
       addLog('info', `Color Analysis - Healthy: ${finalResult.colorAnalysis.healthy.toFixed(1)}%, Warning: ${finalResult.colorAnalysis.warning.toFixed(1)}%, Danger: ${finalResult.colorAnalysis.danger.toFixed(1)}%`);
       addLog('info', `Overall Confidence: ${finalResult.confidence.toFixed(1)}%`);
       addLog(
-        finalResult.moldDetected || (geminiQuality && !geminiQuality.safeToEat) ? 'warning' : 'success',
-        finalResult.moldDetected || (geminiQuality && !geminiQuality.safeToEat)
-          ? 'Potential issues detected. Proceeding to signal processing...'
+        finalResult.moldDetected ? 'warning' : 'success',
+        finalResult.moldDetected
+          ? 'Potential contamination detected. Proceeding to signal processing...'
           : 'Visual analysis looks healthy. Proceeding to signal processing...',
       );
 
@@ -203,7 +152,7 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
       
       setIsProcessing(false);
     }
-  }, [uploadedImage, hasStarted, addLog, onComplete, roboflowService, geminiService]);
+  }, [uploadedImage, hasStarted, addLog, onComplete, roboflowService]);
 
   useEffect(() => {
     if (isActive && uploadedImage && !hasStarted) {
@@ -277,70 +226,6 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
                 </div>
 
                 <h3 className="text-base sm:text-lg font-semibold text-white">Quality Analysis</h3>
-
-                {/* Gemini Quality Results */}
-                {qualityResult && (
-                  <div className={`rounded-lg p-4 border ${
-                    qualityResult.safeToEat 
-                      ? 'bg-green-500/10 border-green-500/30' 
-                      : 'bg-red-500/10 border-red-500/30'
-                  }`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl">{qualityResult.safeToEat ? '✅' : '🚫'}</span>
-                        <div>
-                          <p className="text-white font-bold capitalize">{qualityResult.overallQuality} Quality</p>
-                          <p className={`text-sm ${qualityResult.safeToEat ? 'text-green-400' : 'text-red-400'}`}>
-                            {qualityResult.safeToEat ? 'Safe to eat' : 'Not safe to eat'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-cyan-400">{qualityResult.freshnessScore}%</p>
-                        <p className="text-xs text-slate-500">freshness</p>
-                      </div>
-                    </div>
-                    
-                    <p className="text-slate-300 text-sm mb-3">{qualityResult.description}</p>
-                    
-                    {qualityResult.issues.length > 0 && (
-                      <div className="mb-3">
-                        <p className="text-slate-500 text-xs mb-1">Issues Detected:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {qualityResult.issues.map((issue, i) => (
-                            <span key={i} className="bg-red-500/20 text-red-300 text-xs px-2 py-1 rounded">
-                              {issue}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {qualityResult.recommendations.length > 0 && (
-                      <div>
-                        <p className="text-slate-500 text-xs mb-1">Recommendations:</p>
-                        <ul className="text-slate-400 text-xs space-y-1">
-                          {qualityResult.recommendations.map((rec, i) => (
-                            <li key={i}>• {rec}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 mt-3">
-                      {qualityResult.moldDetected && (
-                        <span className="bg-red-500/30 text-red-300 text-xs px-2 py-1 rounded flex items-center gap-1">
-                          🦠 Mold
-                        </span>
-                      )}
-                      {qualityResult.discoloration && (
-                        <span className="bg-yellow-500/30 text-yellow-300 text-xs px-2 py-1 rounded flex items-center gap-1">
-                          🎨 Discoloration
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <div className="bg-slate-800/50 rounded-lg p-3 sm:p-4">
