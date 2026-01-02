@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import TerminalUI from './TerminalUI';
 import { TerminalLog, ImageAnalysisResult, FoodType } from '@/types';
-import RoboFlowService, { RoboFlowPrediction } from '@/services/roboflowService';
+import HuggingFaceService from '@/services/huggingFaceService';
 
 interface ImageAnalysisStepProps {
   uploadedImage: string | null;
@@ -11,15 +11,12 @@ interface ImageAnalysisStepProps {
   isActive: boolean;
 }
 
-// Non usiamo più un database mock di alimenti: tutto il feedback
-// deriva dal modello YOLOv8 (o da mapping deterministici)
-
 export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive }: ImageAnalysisStepProps) {
   const [logs, setLogs] = useState<TerminalLog[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<ImageAnalysisResult | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
-  const [roboFlowService] = useState(() => new RoboFlowService());
+  const [huggingFaceService] = useState(() => new HuggingFaceService());
 
   const addLog = useCallback((type: TerminalLog['type'], message: string) => {
     setLogs(prev => [...prev, {
@@ -30,178 +27,122 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
     }]);
   }, []);
 
-  // Non eseguiamo più riconoscimento mock dell'alimento: il "nome"
-  // mostrerà la classe restituita da YOLOv8 (o un valore generico).
-
-  const simulateAnalysis = useCallback(async () => {
+  const analyzeImage = useCallback(async () => {
     if (!uploadedImage || hasStarted) return;
 
     setHasStarted(true);
     setIsProcessing(true);
     setLogs([]);
 
-    // Phase 1: Initialization
-    addLog('info', 'Initializing Image Analysis Agent with RoboFlow Integration...');
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    addLog('processing', 'Loading computer vision models...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    addLog('success', 'Model loaded: ResNet-50 with custom food safety weights');
-    await new Promise(resolve => setTimeout(resolve, 400));
-
-    addLog('success', 'Model loaded: RoboFlow YOLOv8 Workflow (nutriguard/yolov8)');
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
-    addLog('info', 'RoboFlow: Single YOLOv8 workflow for freshness & detections');
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    // Phase 2: Send image to RoboFlow (single workflow)
-    addLog('processing', 'Sending image to RoboFlow YOLOv8 workflow...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    let roboFlowPrediction: RoboFlowPrediction | null = null;
-    let detectedClass: string | null = null;
-    let freshnessLabel: 'fresh' | 'ripening' | 'rotten' = 'fresh';
-    let freshnessConfidence = 0;
-    
     try {
+      // Phase 1: Initialization
+      addLog('info', 'Initializing Image Analysis Agent...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      addLog('processing', 'Loading AI vision model...');
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Check configuration (Hugging Face funziona anche senza API key)
+      if (!huggingFaceService.isConfigured()) {
+        addLog('error', 'Hugging Face service not available');
+        setIsProcessing(false);
+        return;
+      }
+
+      addLog('success', 'Model loaded: Hugging Face (Free & Open Source)');
+      addLog('info', 'Using free tier - no API key required');
+      addLog('info', 'Note: Free models may have lower accuracy. For better results, consider using OpenAI Vision.');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      // Phase 2: Image Analysis
+      addLog('processing', 'Analyzing image with Hugging Face AI...');
+      await new Promise(resolve => setTimeout(resolve, 600));
+
       const imageBase64 = uploadedImage.includes(',')
         ? uploadedImage
         : `data:image/jpeg;base64,${uploadedImage}`;
 
-      roboFlowPrediction = await roboFlowService.analyzeImage(imageBase64);
-      addLog('success', 'RoboFlow analysis completed');
+      addLog('info', 'Sending image to Hugging Face API (free)...');
+      const analysis = await huggingFaceService.analyzeImage(imageBase64);
 
-      const predictions = roboFlowPrediction.predictions || roboFlowPrediction.detections || [];
-      if (predictions.length > 0) {
-        const bestPrediction = predictions.sort((a, b) => b.confidence - a.confidence)[0];
-        detectedClass = bestPrediction.class;
-        addLog(
-          'info',
-          `RoboFlow detected class: ${detectedClass} (${(bestPrediction.confidence * 100).toFixed(1)}% confidence)`,
-        );
-      } else {
-        addLog('warning', 'RoboFlow did not return any detections, using fallback analysis');
+      addLog('success', 'Analysis completed!');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      // Log results
+      addLog('info', `Detected: ${analysis.foodName}`);
+      addLog('info', `Category: ${analysis.category}`);
+      addLog('info', `Freshness: ${analysis.freshness}`);
+      addLog('info', `Confidence: ${(analysis.confidence * 100).toFixed(1)}%`);
+      addLog('info', `Mold Detected: ${analysis.moldDetected ? 'YES' : 'NO'}`);
+      
+      if (analysis.moldDetected) {
+        addLog('warning', `Mold detected - Safety concern!`);
       }
 
-      // Analisi di freschezza basata SOLO sull'output del modello
-      const freshnessAnalysis = roboFlowService.analyzeDetections(roboFlowPrediction);
-      freshnessLabel = freshnessAnalysis.freshness;
-      freshnessConfidence = freshnessAnalysis.confidence;
-      addLog('info', `RoboFlow Freshness Status: ${freshnessLabel}`);
-      addLog('info', `RoboFlow Mold Coverage: ${freshnessAnalysis.moldPercentage.toFixed(1)}%`);
+      // Phase 3: Convert to result format
+      addLog('processing', 'Processing analysis results...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const resultData = huggingFaceService.convertToImageAnalysisResult(analysis, imageBase64);
+
+      addLog('info', `Shelf Life: ${resultData.foodType.shelfLife}`);
+      addLog('info', `Optimal Storage: ${resultData.foodType.optimalStorage}`);
+      addLog('info', `Safety: ${analysis.safetyAssessment}`);
+
+      // Phase 4: Quality Analysis Summary
+      addLog('processing', 'Generating quality assessment...');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      const finalResult: ImageAnalysisResult = {
+        foodType: resultData.foodType,
+        moldDetected: resultData.moldDetected,
+        moldPercentage: resultData.moldPercentage,
+        dominantColors: resultData.dominantColors,
+        colorAnalysis: resultData.colorAnalysis,
+        confidence: resultData.confidence,
+      };
+
+      addLog('info', `Color Analysis - Healthy: ${finalResult.colorAnalysis.healthy.toFixed(1)}%, Warning: ${finalResult.colorAnalysis.warning.toFixed(1)}%, Danger: ${finalResult.colorAnalysis.danger.toFixed(1)}%`);
+      addLog('info', `Overall Confidence: ${finalResult.confidence.toFixed(1)}%`);
+      addLog(
+        finalResult.moldDetected ? 'warning' : 'success',
+        finalResult.moldDetected
+          ? 'Potential contamination detected. Proceeding to signal processing...'
+          : 'Visual analysis looks healthy. Proceeding to signal processing...',
+      );
+
+      setResult(finalResult);
+      setIsProcessing(false);
+      onComplete(finalResult);
     } catch (error) {
-      addLog('warning', 'RoboFlow API call failed, using fallback analysis');
-      roboFlowPrediction = null;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', `Analysis failed: ${errorMessage}`);
+      
+      if (errorMessage.includes('All models failed')) {
+        addLog('warning', 'Hugging Face API models are currently unavailable');
+        addLog('info', 'Possible reasons:');
+        addLog('info', '  - Models are loading (first time use)');
+        addLog('info', '  - Rate limit exceeded (free tier)');
+        addLog('info', '  - Network connectivity issues');
+        addLog('info', '');
+        addLog('info', 'Solutions:');
+        addLog('info', '  1. Wait 10-20 seconds and try again');
+        addLog('info', '  2. Get free API key from https://huggingface.co/settings/tokens');
+        addLog('info', '  3. Consider using OpenAI Vision for more reliable results');
+      } else {
+        addLog('warning', 'Hugging Face service error');
+        addLog('info', 'Please try again or check your internet connection');
+      }
+      
+      setIsProcessing(false);
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Phase 3: Costruzione del "food type" SOLO dai dati YOLOv8
-    addLog('processing', 'Building food profile from YOLOv8 output...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    const storageInfo = roboFlowService.getFreshnessCategoryInfo(freshnessLabel);
-
-    const detectedFood: FoodType = {
-      name: detectedClass
-        ? detectedClass.charAt(0).toUpperCase() + detectedClass.slice(1)
-        : 'Food Item',
-      category: 'other',
-      confidence: Math.max(0, Math.min(100, freshnessConfidence * 100)),
-      shelfLife: storageInfo.shelfLife,
-      optimalStorage: storageInfo.optimalStorage,
-    };
-
-    addLog('success', `Food profile built from model output: ${detectedFood.name}`);
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    addLog('info', `Category: ${detectedFood.category.charAt(0).toUpperCase() + detectedFood.category.slice(1)}`);
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    addLog('info', `Expected shelf life: ${detectedFood.shelfLife}`);
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    addLog('info', `Optimal storage: ${detectedFood.optimalStorage}`);
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Phase 4: Quality Analysis
-    addLog('processing', 'Preprocessing image: resizing to 224x224...');
-    await new Promise(resolve => setTimeout(resolve, 600));
-
-    addLog('processing', 'Extracting color histogram...');
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    addLog('processing', 'Analyzing texture patterns for mold detection...');
-    await new Promise(resolve => setTimeout(resolve, 700));
-
-    addLog('processing', 'Running convolutional neural network inference...');
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    addLog('success', 'Analysis complete!');
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Analyze RoboFlow results (solo dati reali, niente random)
-    let moldDetected = false;
-    let moldPercentage = 0;
-
-    if (roboFlowPrediction && roboFlowPrediction.success) {
-      const freshnessAnalysis = roboFlowService.analyzeDetections(roboFlowPrediction);
-      moldDetected = freshnessAnalysis.moldDetected;
-      moldPercentage = freshnessAnalysis.moldPercentage;
-
-      const detectionCount =
-        (roboFlowPrediction.predictions || roboFlowPrediction.detections || []).length;
-      addLog('info', `RoboFlow Detections: ${detectionCount} object(s) identified`);
-    }
-
-    // Mappa deterministica della freschezza in distribuzione colori
-    let healthy = 70;
-    let warning = 20;
-    let danger = 10;
-    if (freshnessLabel === 'ripening') {
-      healthy = 50;
-      warning = 30;
-      danger = 20;
-    } else if (freshnessLabel === 'rotten') {
-      healthy = 10;
-      warning = 20;
-      danger = 70;
-    }
-
-    const resultData: ImageAnalysisResult = {
-      foodType: detectedFood,
-      moldDetected,
-      moldPercentage,
-      dominantColors: ['#8B4513', '#228B22', '#FFD700'],
-      colorAnalysis: {
-        healthy,
-        warning,
-        danger,
-      },
-      confidence: Math.max(0, Math.min(100, freshnessConfidence * 100)),
-    };
-
-    addLog('info', `Mold Detection: ${resultData.moldDetected ? 'POSITIVE' : 'NEGATIVE'} (${resultData.moldPercentage.toFixed(1)}% coverage)`);
-    addLog('info', `Color Analysis - Healthy: ${resultData.colorAnalysis.healthy.toFixed(1)}%, Warning: ${resultData.colorAnalysis.warning.toFixed(1)}%, Danger: ${resultData.colorAnalysis.danger.toFixed(1)}%`);
-    addLog('info', `Overall Confidence Score: ${resultData.confidence.toFixed(1)}%`);
-    addLog(
-      resultData.moldDetected ? 'warning' : 'success',
-      resultData.moldDetected
-        ? 'Potential contamination detected. Proceeding to signal processing...'
-        : 'Visual analysis looks healthy. Proceeding to signal processing...',
-    );
-
-    setResult(resultData);
-    setIsProcessing(false);
-    onComplete(resultData);
-  }, [uploadedImage, hasStarted, addLog, onComplete, roboFlowService]);
+  }, [uploadedImage, hasStarted, addLog, onComplete, huggingFaceService]);
 
   useEffect(() => {
     if (isActive && uploadedImage && !hasStarted) {
-      simulateAnalysis();
+      analyzeImage();
     }
-  }, [isActive, uploadedImage, hasStarted, simulateAnalysis]);
+  }, [isActive, uploadedImage, hasStarted, analyzeImage]);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -227,7 +168,7 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
               </div>
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-white">Image Analysis Agent</h2>
-                <p className="text-slate-400 text-sm sm:text-base">Computer vision-based food inspection</p>
+                <p className="text-slate-400 text-sm sm:text-base">AI-powered food recognition & safety analysis</p>
               </div>
             </div>
 
@@ -252,7 +193,7 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
                       <p className="text-cyan-400 text-sm capitalize">{result.foodType.category}</p>
                     </div>
                     <div className="ml-auto text-right">
-                      <p className="text-2xl font-bold text-cyan-400">{result.foodType.confidence.toFixed(0)}%</p>
+                      <p className="text-2xl font-bold text-cyan-400">{result.foodType.confidence}%</p>
                       <p className="text-xs text-slate-500">confidence</p>
                     </div>
                   </div>

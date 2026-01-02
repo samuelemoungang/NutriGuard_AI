@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(npx create-next-app:*)",
-      "Bash(powershell -Command \"Copy-Item -Path ''temp-app\\*'' -Destination ''.'' -Recurse -Force; Remove-Item -Path ''temp-app'' -Recurse -Force\")"
+      "Bash(powershell -Command \"Get-ChildItem -LiteralPath 'temp-app' | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination '.' -Recurse -Force } ; Remove-Item -LiteralPath 'temp-app' -Recurse -Force\")",
+      "Bash(npm run build)",
+      "WebSearch",
+      "WebFetch(domain:universe.roboflow.com)",
+      "Bash(curl:*)",
+      "Bash(node test-roboflow.js:*)",
+      "Bash(npm run dev:*)"
     ]
   }
 }
