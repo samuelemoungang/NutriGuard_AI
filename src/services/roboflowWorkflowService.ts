@@ -55,7 +55,11 @@ class RoboflowWorkflowService {
 
   async analyzeImage(imageBase64: string): Promise<FoodAnalysisResult> {
     if (!this.isConfigured()) {
-      throw new Error('Roboflow not configured. Check API key and workflow URL.');
+      const status = this.getConfigStatus();
+      const missing = [];
+      if (!status.apiKey) missing.push('NEXT_PUBLIC_ROBOFLOW_API_KEY');
+      if (!status.workflowUrl) missing.push('NEXT_PUBLIC_ROBOFLOW_WORKFLOW_URL');
+      throw new Error(`Roboflow not configured. Missing: ${missing.join(', ')}`);
     }
 
     // Remove data URL prefix if present
@@ -63,7 +67,13 @@ class RoboflowWorkflowService {
       ? imageBase64.split(',')[1] 
       : imageBase64;
 
+    console.log('[Roboflow] Starting image analysis...');
+    console.log('[Roboflow] Image size:', Math.round(base64Data.length / 1024), 'KB');
+    console.log('[Roboflow] Workflow URL:', this.workflowUrl);
+
     try {
+      const startTime = Date.now();
+      
       // Call our API route to avoid CORS issues
       const response = await fetch('/api/roboflow', {
         method: 'POST',
@@ -77,19 +87,45 @@ class RoboflowWorkflowService {
         }),
       });
 
+      const elapsedTime = Date.now() - startTime;
+      console.log('[Roboflow] API call completed in', elapsedTime, 'ms');
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[Roboflow] API Error:', response.status, errorText);
-        throw new Error(`Roboflow API error: ${response.status} - ${errorText}`);
+        console.error('[Roboflow] API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        });
+        
+        // Provide more helpful error messages
+        if (response.status === 401) {
+          throw new Error('Unauthorized: Invalid API key. Check NEXT_PUBLIC_ROBOFLOW_API_KEY');
+        } else if (response.status === 404) {
+          throw new Error('Not Found: Invalid workflow URL. Check NEXT_PUBLIC_ROBOFLOW_WORKFLOW_URL');
+        } else if (response.status === 400) {
+          throw new Error(`Bad Request: ${errorText}`);
+        } else {
+          throw new Error(`Roboflow API error (${response.status}): ${errorText}`);
+        }
       }
 
       const data: RoboflowWorkflowResponse = await response.json();
-      console.log('[Roboflow] Response:', data);
+      console.log('[Roboflow] Full response received:', JSON.stringify(data, null, 2));
 
-      return this.parseResponse(data);
+      const parsedResult = this.parseResponse(data);
+      console.log('[Roboflow] Parsed result:', parsedResult);
+      
+      return parsedResult;
     } catch (error) {
-      console.error('[Roboflow] Error:', error);
-      throw error;
+      console.error('[Roboflow] Analysis failed:', error);
+      
+      // Re-throw with more context if it's not already an Error
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error(`Unknown error during analysis: ${String(error)}`);
+      }
     }
   }
 
