@@ -1,26 +1,26 @@
-# Flowise Setup Guide - NutriGuard AI Multi-Agent System
+# Guide de Configuration Flowise - Système Multi-Agent NutriGuard AI
 
-## 📋 Panoramica
+## 📋 Vue d'ensemble
 
-Questa guida spiega come configurare Flowise per far sì che gli ultimi due agent (Quality Classification e Final Feedback) ricevano e processino correttamente i dati dai primi due agent (Image Analysis e Signal Processing).
+Ce guide explique comment configurer Flowise pour que les deux derniers agents (Quality Classification et Final Feedback) reçoivent et traitent correctement les données des deux premiers agents (Image Analysis et Signal Processing).
 
-## 🔄 Flusso dei Dati
+## 🔄 Flux des Données
 
 ```
 Agent 1 (Image Analysis) 
-    ↓ [Salva in memoria condivisa]
+    ↓ [Sauvegarde en mémoire partagée]
 Agent 2 (Signal Processing)
-    ↓ [Salva in memoria condivisa]
+    ↓ [Sauvegarde en mémoire partagée]
 Agent 3 (Quality Classification) → Flowise API
-    ↓ [Salva in memoria condivisa]
+    ↓ [Sauvegarde en mémoire partagée]
 Agent 4 (Final Feedback) → Flowise API
 ```
 
-## 📦 Struttura Dati Inviata a Flowise
+## 📦 Structure des Données Envoyées à Flowise
 
 ### Agent 3: Quality Classification
 
-**Payload inviato:**
+**Payload envoyé:**
 ```json
 {
   "question": "Analyze food safety based on: Visual Analysis: Mold detected/not detected (X%), Color health score: X%, pH: X, Gas: Xppm, Storage: Xh at X°C. Provide a quality grade (A-F) and classification.",
@@ -55,13 +55,13 @@ Agent 4 (Final Feedback) → Flowise API
 
 ### Agent 4: Final Feedback
 
-**Payload inviato:**
+**Payload envoyé:**
 ```json
 {
   "question": "Provide a detailed food safety recommendation based on: Grade: A (95/100), Visual: 90%, Chemical: 85%, Storage: 80%, Mold: not detected, pH: 6.5, Gas: 50ppm, Storage: 24h at 4°C. Is this food safe to consume? Explain why or why not.",
   "overrideConfig": {
-    "imageAnalysis": { /* stesso formato di sopra */ },
-    "signalData": { /* stesso formato di sopra */ },
+    "imageAnalysis": { /* même format que ci-dessus */ },
+    "signalData": { /* même format que ci-dessus */ },
     "classification": {
       "grade": "A",
       "score": 95,
@@ -75,31 +75,31 @@ Agent 4 (Final Feedback) → Flowise API
 }
 ```
 
-## 🛠️ Configurazione Flowise
+## 🛠️ Configuration Flowise
 
-### Step 1: Creare il Chatflow per Quality Classification
+### Étape 1: Créer le Chatflow pour Quality Classification
 
-1. **Apri Flowise** e crea un nuovo Chatflow
-2. **Nome**: `Quality Classification Agent`
+1. **Ouvrez Flowise** et créez un nouveau Chatflow
+2. **Nom**: `Quality Classification Agent`
 
-#### Configurazione dei Nodi:
+#### Configuration des Nœuds:
 
 **1. HTTP Request Node (Input)**
 - **Type**: POST
 - **URL**: `/api/v1/prediction/{chatflowId}`
 - **Headers**: `Content-Type: application/json`
-- Questo nodo riceverà il payload dal frontend
+- Ce nœud recevra le payload du frontend
 
 **2. Set Variables Node**
-Estrae i dati da `overrideConfig`:
+Extrait les données de `overrideConfig`:
 
 ```javascript
-// Variabili da estrarre:
+// Variables à extraire:
 const imageAnalysis = $input.body.overrideConfig?.imageAnalysis || {};
 const signalData = $input.body.overrideConfig?.signalData || {};
 const question = $input.body.question || "";
 
-// Salva nelle variabili del flow:
+// Sauvegarde dans les variables du flow:
 $vars.imageAnalysis = imageAnalysis;
 $vars.signalData = signalData;
 $vars.question = question;
@@ -114,8 +114,7 @@ $vars.temperature = signalData.temperature || 0;
 ```
 
 **3. Prompt Template Node**
-Crea un prompt strutturato per l'LLM:
-
+Crée un prompt structuré pour l'LLM:
 ```
 You are a food safety quality classification expert. Analyze the following data and provide a quality grade (A-F) and score (0-100).
 
@@ -159,22 +158,22 @@ Return your response in JSON format:
 ```
 
 **4. LLM Chain Node**
-- **Model**: Scegli il tuo modello LLM (OpenAI, Anthropic, etc.)
-- **Temperature**: 0.3 (per risposte più consistenti)
+- **Model**: Choisissez votre modèle LLM (OpenAI, Anthropic, etc.)
+- **Temperature**: 0.3 (pour des réponses plus cohérentes)
 - **Max Tokens**: 500
 
 **5. Output Parser Node**
-Estrae il JSON dalla risposta:
+Extrait le JSON de la réponse:
 
 ```javascript
-// Prova a parsare la risposta JSON
+// Essaie de parser la réponse JSON
 let result;
 try {
-  // Rimuovi markdown code blocks se presenti
+  // Supprime les blocs de code markdown si présents
   let response = $input.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   result = JSON.parse(response);
 } catch (e) {
-  // Fallback se non è JSON valido
+  // Fallback si ce n'est pas un JSON valide
   result = {
     grade: "C",
     score: 50,
@@ -191,7 +190,7 @@ return result;
 ```
 
 **6. HTTP Response Node**
-Ritorna la risposta al frontend:
+Retourne la réponse au frontend:
 
 ```json
 {
@@ -205,18 +204,18 @@ Ritorna la risposta al frontend:
 }
 ```
 
-### Step 2: Creare il Chatflow per Final Feedback
+### Étape 2: Créer le Chatflow pour Final Feedback
 
-1. **Crea un nuovo Chatflow**
-2. **Nome**: `Final Feedback Agent`
+1. **Créez un nouveau Chatflow**
+2. **Nom**: `Final Feedback Agent`
 
-#### Configurazione dei Nodi:
+#### Configuration des Nœuds:
 
 **1. HTTP Request Node (Input)**
-- Stesso setup del Quality Classification
+- Même configuration que Quality Classification
 
 **2. Set Variables Node**
-Estrae tutti i dati:
+Extrait toutes les données:
 
 ```javascript
 const imageAnalysis = $input.body.overrideConfig?.imageAnalysis || {};
@@ -229,7 +228,7 @@ $vars.signalData = signalData;
 $vars.classification = classification;
 $vars.question = question;
 
-// Estrai valori specifici
+// Extrait les valeurs spécifiques
 $vars.grade = classification.grade || "C";
 $vars.score = classification.score || 50;
 $vars.visualFactor = classification.factors?.visual || 50;
@@ -241,7 +240,7 @@ $vars.gasLevel = signalData.gasLevel || 0;
 ```
 
 **3. Prompt Template Node**
-Crea un prompt per la spiegazione:
+Crée un prompt pour l'explication:
 
 ```
 You are a food safety expert providing detailed recommendations. Based on the following analysis, determine if the food is safe to consume and explain why.
@@ -279,8 +278,8 @@ Return your response in JSON format:
 ```
 
 **4. LLM Chain Node**
-- **Model**: Stesso modello del Quality Classification
-- **Temperature**: 0.4 (leggermente più creativo per spiegazioni)
+- **Model**: Même modèle que Quality Classification
+- **Temperature**: 0.4 (légèrement plus créatif pour les explications)
 - **Max Tokens**: 800
 
 **5. Output Parser Node**
@@ -311,26 +310,26 @@ return result;
 }
 ```
 
-## 🔌 Configurazione API Endpoints
+## 🔌 Configuration des API Endpoints
 
-### Nel file `.env.local` del frontend:
+### Dans le fichier `.env.local` du frontend:
 
 ```env
 NEXT_PUBLIC_FLOWISE_CLASSIFY_URL=http://localhost:3000/api/v1/prediction/{chatflowId-classify}
 NEXT_PUBLIC_FLOWISE_FEEDBACK_URL=http://localhost:3000/api/v1/prediction/{chatflowId-feedback}
 ```
 
-**Nota**: Sostituisci `{chatflowId-classify}` e `{chatflowId-feedback}` con gli ID reali dei tuoi chatflow.
+**Note**: Remplacez `{chatflowId-classify}` et `{chatflowId-feedback}` par les ID réels de vos chatflows.
 
-### Come ottenere il Chatflow ID:
+### Comment obtenir le Chatflow ID:
 
-1. In Flowise, apri il chatflow
-2. L'URL sarà simile a: `http://localhost:3000/chatflow/{chatflowId}`
-3. Copia l'ID dal URL
+1. Dans Flowise, ouvrez le chatflow
+2. L'URL sera similaire à: `http://localhost:3000/chatflow/{chatflowId}`
+3. Copiez l'ID depuis l'URL
 
-## 📝 Esempio di Prompt Template Avanzato
+## 📝 Exemple de Prompt Template Avancé
 
-### Per Quality Classification (più dettagliato):
+### Pour Quality Classification (plus détaillé):
 
 ```
 You are an expert food safety quality classifier. Analyze the provided data and assign a quality grade.
@@ -361,7 +360,7 @@ GRADING CRITERIA:
 Provide JSON response with grade, score, and factor breakdown.
 ```
 
-## 🧪 Testing
+## 🧪 Tests
 
 ### Test Quality Classification:
 
@@ -407,22 +406,22 @@ curl -X POST http://localhost:3000/api/v1/prediction/{chatflowId-feedback} \
   }'
 ```
 
-## 🔍 Debugging
+## 🔍 Débogage
 
-### Verifica che i dati arrivino correttamente:
+### Vérifier que les données arrivent correctement:
 
-1. **Aggiungi un Debug Node** in Flowise prima del Set Variables
-2. **Log il payload** completo: `console.log($input.body)`
-3. **Verifica** che `overrideConfig` contenga tutti i dati
+1. **Ajoutez un Debug Node** dans Flowise avant le Set Variables
+2. **Enregistrez le payload** complet: `console.log($input.body)`
+3. **Vérifiez** que `overrideConfig` contient toutes les données
 
-### Problemi comuni:
+### Problèmes courants:
 
-1. **Dati mancanti**: Verifica che il frontend invii `overrideConfig`
-2. **Parsing errors**: Assicurati che l'Output Parser gestisca errori
-3. **JSON malformato**: Usa try-catch nel parser
-4. **CORS errors**: Configura CORS in Flowise se necessario
+1. **Données manquantes**: Vérifiez que le frontend envoie `overrideConfig`
+2. **Erreurs de parsing**: Assurez-vous que l'Output Parser gère les erreurs
+3. **JSON malformé**: Utilisez try-catch dans le parser
+4. **Erreurs CORS**: Configurez CORS dans Flowise si nécessaire
 
-## 📚 Risorse Aggiuntive
+## 📚 Ressources Additionnelles
 
 - [Flowise Documentation](https://docs.flowiseai.com/)
 - [Flowise GitHub](https://github.com/FlowiseAI/Flowise)
@@ -430,12 +429,12 @@ curl -X POST http://localhost:3000/api/v1/prediction/{chatflowId-feedback} \
 
 ## ✅ Checklist Finale
 
-- [ ] Chatflow Quality Classification creato
-- [ ] Chatflow Final Feedback creato
-- [ ] Variabili estratte correttamente da `overrideConfig`
-- [ ] Prompt templates configurati
-- [ ] Output parsers gestiscono errori
-- [ ] API endpoints configurati in `.env.local`
-- [ ] Chatflow IDs aggiunti alle variabili d'ambiente
-- [ ] Test eseguiti con curl o Postman
-- [ ] Frontend si connette correttamente a Flowise
+- [ ] Chatflow Quality Classification créé
+- [ ] Chatflow Final Feedback créé
+- [ ] Variables extraites correctement de `overrideConfig`
+- [ ] Prompt templates configurés
+- [ ] Output parsers gèrent les erreurs
+- [ ] API endpoints configurés dans `.env.local`
+- [ ] Chatflow IDs ajoutés aux variables d'environnement
+- [ ] Tests exécutés avec curl ou Postman
+- [ ] Frontend se connecte correctement à Flowise

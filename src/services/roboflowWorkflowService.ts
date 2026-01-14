@@ -3,6 +3,8 @@
  * Utilizza YOLOv8 per il riconoscimento degli alimenti
  */
 
+import { FoodType } from '@/types';
+
 export interface RoboflowPrediction {
   class: string;
   confidence: number;
@@ -256,10 +258,10 @@ class RoboflowWorkflowService {
       .join(' ');
   }
 
-  private determineCategory(className: string): string {
+  private determineCategory(className: string): FoodType['category'] {
     const lowerClass = className.toLowerCase();
     
-    const categories: Record<string, string[]> = {
+    const categories: Record<FoodType['category'], string[]> = {
       fruit: ['apple', 'banana', 'orange', 'grape', 'strawberry', 'mango', 'pear', 'peach', 'cherry', 'watermelon', 'melon', 'kiwi', 'pineapple', 'lemon', 'lime', 'fruit'],
       vegetable: ['carrot', 'tomato', 'potato', 'onion', 'lettuce', 'broccoli', 'cucumber', 'pepper', 'spinach', 'cabbage', 'celery', 'vegetable', 'zucchini', 'eggplant'],
       meat: ['beef', 'chicken', 'pork', 'lamb', 'steak', 'meat', 'ham', 'bacon', 'sausage'],
@@ -267,11 +269,12 @@ class RoboflowWorkflowService {
       dairy: ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'dairy', 'egg'],
       grain: ['bread', 'rice', 'pasta', 'cereal', 'wheat', 'oat', 'grain', 'noodle'],
       processed: ['pizza', 'burger', 'sandwich', 'fries', 'chips', 'cake', 'cookie', 'candy', 'soda', 'processed'],
+      other: [],
     };
 
     for (const [category, keywords] of Object.entries(categories)) {
       if (keywords.some(keyword => lowerClass.includes(keyword))) {
-        return category;
+        return category as FoodType['category'];
       }
     }
 
@@ -323,13 +326,20 @@ class RoboflowWorkflowService {
 
     const isSpoiled = analysis.freshness === 'spoiled' || analysis.freshness === 'stale';
 
+    // Assicura che la categoria sia del tipo corretto
+    const validCategories: FoodType['category'][] = ['fruit', 'vegetable', 'meat', 'dairy', 'grain', 'seafood', 'processed', 'other'];
+    const validCategory: FoodType['category'] = 
+      validCategories.includes(analysis.category as FoodType['category'])
+      ? (analysis.category as FoodType['category'])
+      : 'other';
+
     return {
       foodType: {
         name: analysis.foodName,
-        category: analysis.category,
+        category: validCategory,
         confidence: Math.round(analysis.confidence * 100),
-        shelfLife: shelfLifeMap[analysis.category] || 'Varies',
-        optimalStorage: storageMap[analysis.category] || 'Check guidelines',
+        shelfLife: shelfLifeMap[validCategory] || 'Varies',
+        optimalStorage: storageMap[validCategory] || 'Check guidelines',
       },
       moldDetected: isSpoiled,
       moldPercentage: isSpoiled ? 15 : 0,

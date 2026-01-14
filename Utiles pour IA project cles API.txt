@@ -1,0 +1,11 @@
+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
+
+$2b$10$6bpiM5YSwPTTPasLx0jdGenRVrWFe2qYXURhdnLwTyqu8gClrqcwy
+
+UPDATE User
+SET password = '$2b$10$6bpiM5YSwPTTPasLx0jdGenRVrWFe2qYXURhdnLwTyqu8gClrqcwy'
+WHERE email = 'sammymunghi3@gmail.com';
+
+UPDATE User
+SET credential = '{"password":"$2b$10$6bpiM5YSwPTTPasLx0jdGenRVrWFe2qYXURhdnLwTyqu8gClrqcwy"}'
+WHERE email = 'sammymunghi3@gmail.com';

@@ -1,23 +1,23 @@
-# Flowise Node Configuration - Dettagli Tecnici
+# Configuration des Nœuds Flowise - Détails Techniques
 
-## 🎯 Overview
+## 🎯 Vue d'ensemble
 
-Questo documento fornisce le configurazioni esatte per ogni nodo Flowise necessario per far funzionare gli agent Quality Classification e Final Feedback.
+Ce document fournit les configurations exactes pour chaque nœud Flowise nécessaire pour faire fonctionner les agents Quality Classification et Final Feedback.
 
-## 📊 Agent 3: Quality Classification - Configurazione Dettagliata
+## 📊 Agent 3: Quality Classification - Configuration Détaillée
 
-### Nodo 1: HTTP Request (Input)
+### Nœud 1: HTTP Request (Input)
 
-**Tipo**: HTTP Request  
+**Type**: HTTP Request  
 **Method**: POST  
 **URL Path**: `/api/v1/prediction/{chatflowId}`
 
-**Configurazione Headers**:
+**Configuration Headers**:
 ```
 Content-Type: application/json
 ```
 
-**Body Structure** (ricevuto dal frontend):
+**Structure du Body** (reçu du frontend):
 ```json
 {
   "question": "string",
@@ -30,23 +30,23 @@ Content-Type: application/json
 
 ---
 
-### Nodo 2: Set Variables
+### Nœud 2: Set Variables
 
-**Tipo**: Set Variables  
+**Type**: Set Variables  
 **Script**:
 
 ```javascript
-// Estrai il body della richiesta
+// Extrait le body de la requête
 const body = $input.body || {};
 const overrideConfig = body.overrideConfig || {};
 const imageAnalysis = overrideConfig.imageAnalysis || {};
 const signalData = overrideConfig.signalData || {};
 
-// Estrai foodType
+// Extrait foodType
 const foodType = imageAnalysis.foodType || {};
 const colorAnalysis = imageAnalysis.colorAnalysis || {};
 
-// Imposta tutte le variabili necessarie
+// Définit toutes les variables nécessaires
 $vars.foodName = foodType.name || "Unknown Food";
 $vars.foodCategory = foodType.category || "other";
 $vars.foodConfidence = imageAnalysis.confidence || 0;
@@ -62,20 +62,20 @@ $vars.temperature = signalData.temperature || 0;
 $vars.shelfLife = foodType.shelfLife || "Unknown";
 $vars.optimalStorage = foodType.optimalStorage || "Unknown";
 
-// Calcola indicatori
+// Calcule les indicateurs
 $vars.phStatus = ($vars.ph >= 4.5 && $vars.ph <= 7.0) ? "normal" : "abnormal";
 $vars.gasStatus = $vars.gasLevel < 100 ? "normal" : ($vars.gasLevel < 200 ? "elevated" : "high");
 $vars.storageStatus = $vars.storageTime < 48 ? "acceptable" : "extended";
 
-// Passa al prossimo nodo
+// Passe au nœud suivant
 return $input;
 ```
 
 ---
 
-### Nodo 3: Prompt Template
+### Nœud 3: Prompt Template
 
-**Tipo**: Prompt Template  
+**Type**: Prompt Template  
 **Template**:
 
 ```
@@ -155,41 +155,41 @@ IMPORTANT: Return ONLY the JSON object, nothing else.
 
 ---
 
-### Nodo 4: LLM Chain
+### Nœud 4: LLM Chain
 
-**Tipo**: LLM Chain  
-**Model Configuration**:
+**Type**: LLM Chain  
+**Configuration du Modèle**:
 
 - **Provider**: OpenAI / Anthropic / etc.
-- **Model**: `gpt-4` o `gpt-3.5-turbo` (per OpenAI)
-- **Temperature**: `0.3` (bassa per consistenza)
+- **Model**: `gpt-4` ou `gpt-3.5-turbo` (pour OpenAI)
+- **Temperature**: `0.3` (faible pour la cohérence)
 - **Max Tokens**: `500`
 - **Top P**: `1`
 - **Frequency Penalty**: `0`
 - **Presence Penalty**: `0`
 
-**System Message** (opzionale):
+**System Message** (optionnel):
 ```
 You are a food safety expert specializing in quality classification. Always respond with valid JSON only.
 ```
 
 ---
 
-### Nodo 5: Output Parser
+### Nœud 5: Output Parser
 
-**Tipo**: Code  
+**Type**: Code  
 **Script**:
 
 ```javascript
-// Ottieni la risposta dal LLM
+// Obtient la réponse du LLM
 const llmResponse = $input.text || $input || "";
 
-// Funzione per estrarre JSON da una stringa
+// Fonction pour extraire JSON d'une chaîne
 function extractJSON(text) {
-  // Rimuovi markdown code blocks
+  // Supprime les blocs de code markdown
   let cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
   
-  // Prova a trovare un oggetto JSON nella stringa
+  // Essaie de trouver un objet JSON dans la chaîne
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     cleaned = jsonMatch[0];
@@ -202,14 +202,14 @@ function extractJSON(text) {
   }
 }
 
-// Prova a parsare la risposta
+// Essaie de parser la réponse
 let result = extractJSON(llmResponse);
 
-// Fallback se il parsing fallisce
+// Fallback si le parsing échoue
 if (!result || typeof result !== 'object') {
   console.warn('Failed to parse LLM response, using fallback');
   
-  // Calcola un fallback basato sui dati
+  // Calcule un fallback basé sur les données
   const moldPenalty = $vars.moldDetected ? 30 : 0;
   const moldPercentPenalty = $vars.moldPercentage * 2;
   const colorPenalty = (100 - $vars.colorHealthy) * 0.3;
@@ -239,7 +239,7 @@ if (!result || typeof result !== 'object') {
   };
 }
 
-// Valida e normalizza il risultato
+// Valide et normalise le résultat
 const validatedResult = {
   grade: ['A', 'B', 'C', 'D', 'F'].includes(result.grade) ? result.grade : 'C',
   score: Math.max(0, Math.min(100, Math.round(result.score || 50))),
@@ -256,9 +256,9 @@ return validatedResult;
 
 ---
 
-### Nodo 6: HTTP Response
+### Nœud 6: HTTP Response
 
-**Tipo**: HTTP Response  
+**Type**: HTTP Response  
 **Response Body**:
 
 ```json
@@ -278,15 +278,15 @@ return validatedResult;
 
 ---
 
-## 📊 Agent 4: Final Feedback - Configurazione Dettagliata
+## 📊 Agent 4: Final Feedback - Configuration Détaillée
 
-### Nodo 1: HTTP Request (Input)
+### Nœud 1: HTTP Request (Input)
 
-Stesso del Quality Classification.
+Identique à Quality Classification.
 
 ---
 
-### Nodo 2: Set Variables
+### Nœud 2: Set Variables
 
 **Script**:
 
@@ -322,11 +322,11 @@ $vars.visualFactor = classification.factors?.visual || 50;
 $vars.chemicalFactor = classification.factors?.chemical || 50;
 $vars.storageFactor = classification.factors?.storage || 50;
 
-// Calcola indicatori
+// Calcule les indicateurs
 $vars.phStatus = ($vars.ph >= 4.5 && $vars.ph <= 7.0) ? "normal" : "abnormal";
 $vars.gasStatus = $vars.gasLevel < 100 ? "normal" : ($vars.gasLevel < 200 ? "elevated" : "high");
 
-// Determina se è sicuro (preliminare)
+// Détermine si c'est sûr (préliminaire)
 $vars.isLikelySafe = $vars.score >= 60 && !$vars.moldDetected;
 
 return $input;
@@ -334,7 +334,7 @@ return $input;
 
 ---
 
-### Nodo 3: Prompt Template
+### Nœud 3: Prompt Template
 
 **Template**:
 
@@ -413,17 +413,17 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no code blocks.
 
 ---
 
-### Nodo 4: LLM Chain
+### Nœud 4: LLM Chain
 
 **Configuration**:
-- **Model**: `gpt-4` o equivalente
-- **Temperature**: `0.4` (leggermente più alto per spiegazioni)
+- **Model**: `gpt-4` ou équivalent
+- **Temperature**: `0.4` (légèrement plus élevé pour les explications)
 - **Max Tokens**: `800`
 - **Top P**: `1`
 
 ---
 
-### Nodo 5: Output Parser
+### Nœud 5: Output Parser
 
 **Script**:
 
@@ -466,7 +466,7 @@ if (!result || typeof result !== 'object') {
   };
 }
 
-// Valida e normalizza
+// Valide et normalise
 const validatedResult = {
   isSafe: Boolean(result.isSafe),
   riskLevel: ['low', 'medium', 'high', 'critical'].includes(result.riskLevel) 
@@ -483,7 +483,7 @@ return validatedResult;
 
 ---
 
-### Nodo 6: HTTP Response
+### Nœud 6: HTTP Response
 
 **Response Body**:
 
@@ -498,7 +498,7 @@ return validatedResult;
 
 ---
 
-## 🔗 Connessione dei Nodi
+## 🔗 Connexion des Nœuds
 
 ### Quality Classification Flow:
 ```
@@ -510,28 +510,28 @@ HTTP Request → Set Variables → Prompt Template → LLM Chain → Output Pars
 HTTP Request → Set Variables → Prompt Template → LLM Chain → Output Parser → HTTP Response
 ```
 
-## ✅ Testing Checklist
+## ✅ Checklist de Tests
 
-Per ogni chatflow:
+Pour chaque chatflow:
 
-1. [ ] HTTP Request riceve correttamente il payload
-2. [ ] Set Variables estrae tutti i dati da `overrideConfig`
-3. [ ] Prompt Template genera un prompt valido
-4. [ ] LLM Chain restituisce una risposta
-5. [ ] Output Parser estrae JSON correttamente
-6. [ ] HTTP Response formatta correttamente la risposta
-7. [ ] Frontend riceve la risposta nel formato atteso
+1. [ ] HTTP Request reçoit correctement le payload
+2. [ ] Set Variables extrait toutes les données de `overrideConfig`
+3. [ ] Prompt Template génère un prompt valide
+4. [ ] LLM Chain retourne une réponse
+5. [ ] Output Parser extrait le JSON correctement
+6. [ ] HTTP Response formate correctement la réponse
+7. [ ] Frontend reçoit la réponse dans le format attendu
 
-## 🐛 Troubleshooting
+## 🐛 Dépannage
 
-### Problema: Variabili non definite
-**Soluzione**: Verifica che Set Variables estragga correttamente da `overrideConfig`
+### Problème: Variables non définies
+**Solution**: Vérifiez que Set Variables extrait correctement de `overrideConfig`
 
-### Problema: JSON parsing errors
-**Soluzione**: Aggiungi fallback nel Output Parser
+### Problème: Erreurs de parsing JSON
+**Solution**: Ajoutez un fallback dans l'Output Parser
 
-### Problema: LLM non restituisce JSON
-**Soluzione**: Aggiungi istruzioni esplicite nel prompt e usa temperature più bassa
+### Problème: LLM ne retourne pas de JSON
+**Solution**: Ajoutez des instructions explicites dans le prompt et utilisez une température plus basse
 
-### Problema: Risposta non formattata correttamente
-**Soluzione**: Verifica HTTP Response node e assicurati che usi `$input` correttamente
+### Problème: Réponse non formatée correctement
+**Solution**: Vérifiez le nœud HTTP Response et assurez-vous qu'il utilise `$input` correctement
