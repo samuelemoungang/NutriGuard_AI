@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import TerminalUI from './TerminalUI';
 import { TerminalLog, ImageAnalysisResult } from '@/types';
 import RoboflowWorkflowService from '@/services/roboflowWorkflowService';
+import agentMemoryService from '@/services/agentMemoryService';
 
 interface ImageAnalysisStepProps {
   uploadedImage: string | null;
@@ -127,6 +128,11 @@ export default function ImageAnalysisStep({ uploadedImage, onComplete, isActive 
 
       setResult(finalResult);
       setIsProcessing(false);
+      
+      // Salva l'output nella memoria condivisa per tutti gli agent successivi
+      agentMemoryService.setImageAnalysis(finalResult);
+      addLog('info', 'Output saved to shared memory for downstream agents');
+      
       onComplete(finalResult);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

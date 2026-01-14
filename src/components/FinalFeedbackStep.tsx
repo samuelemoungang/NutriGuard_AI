@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import TerminalUI from './TerminalUI';
 import { TerminalLog, ImageAnalysisResult, SignalProcessingData, QualityClassification, FinalFeedback } from '@/types';
+import agentMemoryService from '@/services/agentMemoryService';
 
 interface FinalFeedbackStepProps {
   imageAnalysis: ImageAnalysisResult | null;
@@ -110,6 +111,25 @@ export default function FinalFeedbackStep({
     addLog('info', 'Aggregating all agent outputs...');
     await new Promise(resolve => setTimeout(resolve, 500));
 
+    // Legge tutti gli output degli agent precedenti dalla memoria condivisa
+    const allMemory = agentMemoryService.getAllMemory();
+    
+    if (allMemory.imageAnalysis) {
+      addLog('info', `✓ Retrieved Image Analysis from shared memory`);
+      addLog('info', `  - Food: ${allMemory.imageAnalysis.foodType.name}`);
+    }
+    
+    if (allMemory.signalData) {
+      addLog('info', `✓ Retrieved Signal Data from shared memory`);
+    }
+    
+    if (allMemory.classification) {
+      addLog('info', `✓ Retrieved Classification from shared memory`);
+      addLog('info', `  - Grade: ${allMemory.classification.grade} (${allMemory.classification.score}/100)`);
+    }
+    
+    addLog('info', `📊 Complete context loaded from shared memory`);
+
     // Try Flowise API first
     const flowiseResponse = await callFlowiseAPI();
 
@@ -196,6 +216,12 @@ export default function FinalFeedbackStep({
 
     setResult(mockResult);
     setIsProcessing(false);
+    
+    // Salva l'output nella memoria condivisa
+    agentMemoryService.setFeedback(mockResult);
+    addLog('info', 'Output saved to shared memory');
+    addLog('info', `📋 Memory summary: ${agentMemoryService.getSummary()}`);
+    
     onComplete(mockResult);
   }, [imageAnalysis, signalData, classification, hasStarted, addLog, callFlowiseAPI, onComplete]);
 

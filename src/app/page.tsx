@@ -10,6 +10,7 @@ import {
   FinalFeedbackStep,
 } from '@/components';
 import { AppState, ImageAnalysisResult, SignalProcessingData, QualityClassification, FinalFeedback } from '@/types';
+import agentMemoryService from '@/services/agentMemoryService';
 
 const STEP_LABELS = ['Image Analysis', 'Signal Processing', 'Classification', 'Feedback'];
 
@@ -37,6 +38,10 @@ export default function Home() {
   }, []);
 
   const handleImageUpload = useCallback((file: File, preview: string) => {
+    // Resetta la memoria condivisa quando si carica una nuova immagine
+    agentMemoryService.reset();
+    agentMemoryService.startSession();
+    
     setAppState(prev => ({
       ...prev,
       imageFile: file,

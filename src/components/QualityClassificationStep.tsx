@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import TerminalUI from './TerminalUI';
 import { TerminalLog, ImageAnalysisResult, SignalProcessingData, QualityClassification } from '@/types';
+import agentMemoryService from '@/services/agentMemoryService';
 
 interface QualityClassificationStepProps {
   imageAnalysis: ImageAnalysisResult | null;
@@ -107,6 +108,25 @@ export default function QualityClassificationStep({
     addLog('info', 'Receiving data from upstream agents...');
     await new Promise(resolve => setTimeout(resolve, 500));
 
+    // Legge gli output degli agent precedenti dalla memoria condivisa
+    const imageAnalysisFromMemory = agentMemoryService.getImageAnalysis();
+    const signalDataFromMemory = agentMemoryService.getSignalData();
+    
+    if (imageAnalysisFromMemory) {
+      addLog('info', `✓ Retrieved Image Analysis from shared memory`);
+      addLog('info', `  - Food: ${imageAnalysisFromMemory.foodType.name} (${imageAnalysisFromMemory.foodType.category})`);
+      addLog('info', `  - Mold: ${imageAnalysisFromMemory.moldDetected ? 'Detected' : 'Not detected'} (${imageAnalysisFromMemory.moldPercentage.toFixed(1)}%)`);
+    } else {
+      addLog('warning', '⚠ Image Analysis not found in shared memory');
+    }
+    
+    if (signalDataFromMemory) {
+      addLog('info', `✓ Retrieved Signal Data from shared memory`);
+      addLog('info', `  - pH: ${signalDataFromMemory.ph}, Gas: ${signalDataFromMemory.gasLevel}ppm`);
+    } else {
+      addLog('warning', '⚠ Signal Data not found in shared memory');
+    }
+
     // Try Flowise API first
     const flowiseResponse = await callFlowiseAPI();
 
@@ -175,6 +195,11 @@ export default function QualityClassificationStep({
 
     setResult(mockResult);
     setIsProcessing(false);
+    
+    // Salva l'output nella memoria condivisa
+    agentMemoryService.setClassification(mockResult);
+    addLog('info', 'Output saved to shared memory for downstream agents');
+    
     onComplete(mockResult);
   }, [imageAnalysis, signalData, hasStarted, addLog, callFlowiseAPI, onComplete]);
 

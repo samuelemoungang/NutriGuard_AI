@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import TerminalUI from './TerminalUI';
 import { TerminalLog, SignalProcessingData, ImageAnalysisResult } from '@/types';
+import agentMemoryService from '@/services/agentMemoryService';
 
 interface SignalProcessingStepProps {
   imageAnalysis: ImageAnalysisResult | null;
@@ -32,45 +33,142 @@ export default function SignalProcessingStep({ imageAnalysis, onComplete, isActi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitted) return;
+    if (isSubmitted || isProcessing) return;
 
     setIsProcessing(true);
     setLogs([]);
 
-    const messages: [TerminalLog['type'], string, number][] = [
-      ['info', 'Initializing Signal Processing Agent...', 500],
-      ['processing', 'Loading sensor data processing module...', 600],
-      ['success', 'Module loaded: ChemSense v2.1', 400],
-      ['info', `Received pH reading: ${formData.ph.toFixed(1)}`, 300],
-      ['info', `Received gas sensor reading: ${formData.gasLevel} ppm`, 300],
-      ['info', `Storage duration: ${formData.storageTime} hours at ${formData.temperature}°C`, 300],
-      ['processing', 'Normalizing sensor values...', 700],
-      ['processing', 'Applying Kalman filter for noise reduction...', 800],
-      ['processing', 'Cross-referencing with image analysis results...', 600],
-    ];
+    try {
+      // Step 1: Inizializzazione
+      addLog('info', 'Initializing Signal Processing Agent...');
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-    for (const [type, message, delay] of messages) {
-      await new Promise(resolve => setTimeout(resolve, delay));
-      addLog(type, message);
+      addLog('processing', 'Loading sensor data processing module...');
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      addLog('success', 'Module loaded: ChemSense v2.1');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      // Step 2: Legge l'output del primo agent dalla memoria condivisa
+      addLog('info', '');
+      addLog('info', '═══════════════════════════════════════');
+      addLog('info', '📥 RETRIEVING DATA FROM UPSTREAM AGENT');
+      addLog('info', '═══════════════════════════════════════');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const imageAnalysisFromMemory = agentMemoryService.getImageAnalysis();
+      
+      if (imageAnalysisFromMemory) {
+        addLog('success', '✓ Image Analysis data retrieved from shared memory');
+        addLog('info', '');
+        addLog('info', '📊 IMAGE ANALYSIS RESULTS:');
+        addLog('info', `   Food Type: ${imageAnalysisFromMemory.foodType.name}`);
+        addLog('info', `   Category: ${imageAnalysisFromMemory.foodType.category}`);
+        addLog('info', `   Confidence: ${imageAnalysisFromMemory.confidence.toFixed(1)}%`);
+        addLog('info', `   Mold Detected: ${imageAnalysisFromMemory.moldDetected ? 'YES' : 'NO'}`);
+        if (imageAnalysisFromMemory.moldDetected) {
+          addLog('warning', `   Mold Coverage: ${imageAnalysisFromMemory.moldPercentage.toFixed(1)}%`);
+        }
+        addLog('info', `   Color Analysis:`);
+        addLog('info', `     - Healthy: ${imageAnalysisFromMemory.colorAnalysis.healthy.toFixed(1)}%`);
+        addLog('info', `     - Warning: ${imageAnalysisFromMemory.colorAnalysis.warning.toFixed(1)}%`);
+        addLog('info', `     - Danger: ${imageAnalysisFromMemory.colorAnalysis.danger.toFixed(1)}%`);
+        addLog('info', `   Shelf Life: ${imageAnalysisFromMemory.foodType.shelfLife}`);
+        addLog('info', `   Storage: ${imageAnalysisFromMemory.foodType.optimalStorage}`);
+      } else {
+        addLog('warning', '⚠ Image Analysis not found in shared memory');
+        addLog('warning', '   Proceeding with sensor data only...');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 3: Mostra i parametri inseriti dall'utente
+      addLog('info', '');
+      addLog('info', '═══════════════════════════════════════');
+      addLog('info', '📡 SENSOR DATA INPUT');
+      addLog('info', '═══════════════════════════════════════');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      addLog('info', `   pH Level: ${formData.ph.toFixed(1)}`);
+      addLog('info', `   Gas Level (VOC): ${formData.gasLevel} ppm`);
+      addLog('info', `   Storage Time: ${formData.storageTime} hours`);
+      addLog('info', `   Temperature: ${formData.temperature}°C`);
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 4: Analisi combinata
+      addLog('info', '');
+      addLog('info', '═══════════════════════════════════════');
+      addLog('info', '🔍 COMBINED ANALYSIS SUMMARY');
+      addLog('info', '═══════════════════════════════════════');
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // Analisi pH
+      const phStatus = formData.ph >= 4.5 && formData.ph <= 7.0 ? 'normal' : 'abnormal';
+      const phIcon = phStatus === 'normal' ? '✓' : '⚠';
+      addLog(phStatus === 'normal' ? 'success' : 'warning', `${phIcon} pH: ${formData.ph.toFixed(1)} (${phStatus.toUpperCase()}) - Optimal: 4.5-7.0`);
+
+      // Analisi Gas
+      const gasStatus = formData.gasLevel < 100 ? 'normal' : formData.gasLevel < 200 ? 'elevated' : 'high';
+      const gasIcon = gasStatus === 'normal' ? '✓' : gasStatus === 'elevated' ? '⚠' : '✗';
+      const gasLogType = gasStatus === 'normal' ? 'success' : gasStatus === 'elevated' ? 'warning' : 'error';
+      addLog(gasLogType, `${gasIcon} Gas Level: ${formData.gasLevel} ppm (${gasStatus.toUpperCase()}) - Threshold: 100 ppm`);
+
+      // Analisi Storage Time
+      const storageStatus = formData.storageTime < 48 ? 'acceptable' : 'extended';
+      const storageIcon = storageStatus === 'acceptable' ? '✓' : '⚠';
+      addLog(storageStatus === 'acceptable' ? 'success' : 'warning', `${storageIcon} Storage Time: ${formData.storageTime}h (${storageStatus.toUpperCase()}) - Recommended: <48h`);
+
+      // Analisi Temperature
+      const tempStatus = formData.temperature && formData.temperature <= 4 ? 'optimal' : formData.temperature && formData.temperature <= 8 ? 'acceptable' : 'warning';
+      const tempIcon = tempStatus === 'optimal' ? '✓' : tempStatus === 'acceptable' ? '⚠' : '✗';
+      const tempLogType = tempStatus === 'optimal' ? 'success' : tempStatus === 'acceptable' ? 'warning' : 'error';
+      addLog(tempLogType, `${tempIcon} Temperature: ${formData.temperature}°C (${tempStatus.toUpperCase()}) - Optimal: ≤4°C`);
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 5: Riepilogo finale combinato
+      addLog('info', '');
+      addLog('info', '═══════════════════════════════════════');
+      addLog('info', '📋 DATA AGGREGATION COMPLETE');
+      addLog('info', '═══════════════════════════════════════');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      if (imageAnalysisFromMemory) {
+        addLog('info', 'Combined Dataset:');
+        addLog('info', `  • Visual: ${imageAnalysisFromMemory.foodType.name} (${imageAnalysisFromMemory.confidence.toFixed(0)}% confidence)`);
+        addLog('info', `  • Mold: ${imageAnalysisFromMemory.moldDetected ? 'Detected' : 'Not detected'}`);
+        addLog('info', `  • Chemical: pH ${formData.ph.toFixed(1)}, Gas ${formData.gasLevel}ppm`);
+        addLog('info', `  • Storage: ${formData.storageTime}h @ ${formData.temperature}°C`);
+      } else {
+        addLog('info', 'Dataset:');
+        addLog('info', `  • Chemical: pH ${formData.ph.toFixed(1)}, Gas ${formData.gasLevel}ppm`);
+        addLog('info', `  • Storage: ${formData.storageTime}h @ ${formData.temperature}°C`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 6: Salvataggio nella memoria condivisa
+      addLog('processing', 'Saving aggregated data to shared memory...');
+      agentMemoryService.setSignalData(formData);
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      addLog('success', '✓ Data saved to shared memory for downstream agents');
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      addLog('success', '');
+      addLog('success', '✅ Signal processing complete. Ready for classification agent.');
+      addLog('info', '');
+
+      setIsProcessing(false);
+      setIsSubmitted(true);
+      onComplete(formData);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', `Processing failed: ${errorMessage}`);
+      setIsProcessing(false);
     }
-
-    // Add analysis based on form values
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const phStatus = formData.ph >= 4.5 && formData.ph <= 7.0 ? 'normal' : 'abnormal';
-    const gasStatus = formData.gasLevel < 100 ? 'normal' : formData.gasLevel < 200 ? 'elevated' : 'high';
-    const storageStatus = formData.storageTime < 48 ? 'acceptable' : 'extended';
-
-    addLog(phStatus === 'normal' ? 'success' : 'warning', `pH Analysis: ${phStatus.toUpperCase()} (optimal range: 4.5-7.0)`);
-    addLog(gasStatus === 'normal' ? 'success' : gasStatus === 'elevated' ? 'warning' : 'error', `Gas Level: ${gasStatus.toUpperCase()} (threshold: 100 ppm)`);
-    addLog(storageStatus === 'acceptable' ? 'success' : 'warning', `Storage Time: ${storageStatus.toUpperCase()} (recommended: <48h)`);
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-    addLog('success', 'Signal processing complete. Data ready for classification agent.');
-
-    setIsProcessing(false);
-    setIsSubmitted(true);
-    onComplete(formData);
   };
 
   const handleInputChange = (field: keyof SignalProcessingData, value: number) => {
@@ -121,8 +219,41 @@ export default function SignalProcessingStep({ imageAnalysis, onComplete, isActi
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-slate-300 mb-2">
-                    Gas Level (VOC)
-                    <span className="text-slate-500 font-normal ml-2">(ppm)</span>
+                    <span className="flex items-center gap-2">
+                      Gas Level (VOC)
+                      <span className="text-slate-500 font-normal">(ppm)</span>
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-700 hover:bg-slate-600 border border-slate-600 flex items-center justify-center text-slate-400 hover:text-cyan-400 transition-colors cursor-help"
+                          aria-label="Gas Level (VOC) information"
+                        >
+                          <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 sm:w-72 p-3 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                          <div className="text-xs sm:text-sm text-slate-300 space-y-1.5">
+                            <p className="font-semibold text-cyan-400 mb-2">Gas Level (VOC) Reference Values:</p>
+                            <div className="space-y-1">
+                              <p className="flex items-start gap-2">
+                                <span className="text-green-400 font-semibold">Low (&lt; 100 ppm):</span>
+                                <span className="text-slate-300">Fresh food</span>
+                              </p>
+                              <p className="flex items-start gap-2">
+                                <span className="text-yellow-400 font-semibold">Medium (100-200 ppm):</span>
+                                <span className="text-slate-300">Possible deterioration onset</span>
+                              </p>
+                              <p className="flex items-start gap-2">
+                                <span className="text-red-400 font-semibold">High (&gt; 200 ppm):</span>
+                                <span className="text-slate-300">Advanced deterioration, safety risk</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800"></div>
+                        </div>
+                      </div>
+                    </span>
                   </label>
                   <div className="flex items-center gap-3 sm:gap-4">
                     <input
