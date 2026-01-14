@@ -9,6 +9,7 @@ import {
   QualityClassificationStep,
   FinalFeedbackStep,
 } from '@/components';
+import HoverImageButtons from '@/components/HoverImageButtons';
 import { AppState, ImageAnalysisResult, SignalProcessingData, QualityClassification, FinalFeedback } from '@/types';
 import agentMemoryService from '@/services/agentMemoryService';
 
@@ -140,6 +141,9 @@ export default function Home() {
 
   return (
     <main className="relative overflow-x-hidden">
+      {/* Hover Image Buttons - Bottoni discreti con immagini che si espandono */}
+      <HoverImageButtons />
+      
       <div
         ref={scrollContainerRef}
         className="horizontal-scroll-container min-h-screen"
