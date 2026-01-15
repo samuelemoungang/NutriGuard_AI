@@ -45,7 +45,7 @@ const defaultButtons: HoverImageButton[] = [
   // 5 BOTTONI A SINISTRA (allineati verticalmente)
   {
     id: 'hover-btn-1',
-    imageUrl: '/images/Getting Started with Roboflow.webp', // Immagine Getting Started with Roboflow
+    imageUrl: '/images/Entrypage_FLOWISE.png', // Immagine Getting Started with Roboflow
     position: { top: '10%', left: '3%' },
   },
   {
@@ -55,7 +55,7 @@ const defaultButtons: HoverImageButton[] = [
   },
   {
     id: 'hover-btn-3',
-    imageUrl: '/images/hover-3.jpg', // 👈 CAMBIA QUESTO
+    imageUrl: '/images/Code of SignalProcessing.png', // Immagine Code of Signal Processing
     position: { top: '40%', left: '3%' },
   },
   {
@@ -91,7 +91,7 @@ const defaultButtons: HoverImageButton[] = [
   },
   {
     id: 'hover-btn-10',
-    imageUrl: '/images/hover-10.jpg', // 👈 CAMBIA QUESTO
+    imageUrl: '/images/CODE QR.png', // 👈 CAMBIA QUESTO
     position: { top: '70%', right: '3%' },
   },
 ];

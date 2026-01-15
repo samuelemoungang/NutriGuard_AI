@@ -35,11 +35,86 @@ export default function QualityClassificationStep({
     }]);
   }, []);
 
+  // Helper function to extract useful content from Flowise response
+  const extractFlowiseContent = useCallback((data: any): string | null => {
+    try {
+      // Try to get text directly
+      if (data.text && data.text.trim()) {
+        return data.text;
+      }
+
+      // Try to extract from agentFlowExecutedData (last LLM node output)
+      if (data.agentFlowExecutedData && Array.isArray(data.agentFlowExecutedData)) {
+        // Find the LLM node output (usually the last one before Direct Reply)
+        const llmNode = data.agentFlowExecutedData
+          .slice()
+          .reverse()
+          .find((node: any) => 
+            node.nodeLabel?.toLowerCase().includes('llm') || 
+            node.output?.content
+          );
+        
+        if (llmNode?.output?.content) {
+          return llmNode.output.content;
+        }
+      }
+
+      // Fallback to response field
+      if (data.response) {
+        return typeof data.response === 'string' ? data.response : JSON.stringify(data.response);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error extracting Flowise content:', error);
+      return null;
+    }
+  }, []);
+
+  // Helper function to parse JSON from LLM response text
+  const parseClassificationFromText = useCallback((text: string): QualityClassification | null => {
+    try {
+      // Try to find JSON in the text (might be inside markdown code blocks)
+      const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/\{[\s\S]*"grade"[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        const jsonStr = jsonMatch[1] || jsonMatch[0];
+        const parsed = JSON.parse(jsonStr);
+        
+        if (parsed.grade && parsed.score !== undefined) {
+          return {
+            grade: parsed.grade,
+            score: parsed.score,
+            factors: {
+              visual: parsed.factors?.visual || 0,
+              chemical: parsed.factors?.chemical || 0,
+              storage: parsed.factors?.storage || 0,
+            },
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing classification JSON:', error);
+    }
+    
+    return null;
+  }, []);
+
   const callFlowiseAPI = useCallback(async () => {
-    if (!flowiseEndpoint || !imageAnalysis || !signalData) return null;
+    if (!flowiseEndpoint) {
+      addLog('warning', '⚠ Flowise endpoint not configured. Check NEXT_PUBLIC_FLOWISE_CLASSIFY_URL in .env.local');
+      addLog('info', 'Using fallback classification...');
+      return null;
+    }
+
+    if (!imageAnalysis || !signalData) {
+      addLog('warning', '⚠ Missing required data (imageAnalysis or signalData)');
+      return null;
+    }
 
     try {
       addLog('processing', 'Connecting to Flowise Classification Agent...');
+      addLog('info', `Endpoint: ${flowiseEndpoint}`);
 
       const payload = {
         question: `Analyze food safety based on:
@@ -60,7 +135,11 @@ export default function QualityClassificationStep({
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Flowise API error');
+      if (!response.ok) {
+        const errorText = await response.text();
+        addLog('error', `Flowise API error (${response.status}): ${errorText}`);
+        throw new Error(`Flowise API error: ${response.status} - ${errorText}`);
+      }
 
       // Handle streaming response
       if (response.body) {
@@ -75,19 +154,53 @@ export default function QualityClassificationStep({
           const chunk = decoder.decode(value);
           fullMessage += chunk;
           setStreamingMessage(fullMessage);
-          addLog('info', chunk);
         }
 
+        // Parse the JSON response
+        try {
+          const jsonData = JSON.parse(fullMessage);
+          const content = extractFlowiseContent(jsonData);
+          if (content) return content;
+        } catch {
+          // If not JSON, return as is
+        }
+        
         return fullMessage;
       }
 
       const data = await response.json();
-      return data.text || data.response || JSON.stringify(data);
+      
+      // Extract only the useful content from Flowise response
+      const content = extractFlowiseContent(data);
+      if (content) return content;
+      
+      return data.text || data.response || null;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('warning', 'Flowise API unavailable, using fallback classification...');
+      addLog('error', `Error details: ${errorMessage}`);
+      
+      // Troubleshooting tips
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        addLog('info', '💡 Troubleshooting:');
+        addLog('info', '  1. Check if Flowise Cloud is accessible');
+        addLog('info', '  2. Verify the endpoint URL is correct');
+        addLog('info', '  3. Check CORS settings in Flowise');
+        addLog('info', '  4. Verify the chatflow ID is correct');
+      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        addLog('info', '💡 Troubleshooting:');
+        addLog('info', '  1. Check Flowise authentication settings');
+        addLog('info', '  2. Verify API key if required');
+      } else if (errorMessage.includes('404')) {
+        addLog('info', '💡 Troubleshooting:');
+        addLog('info', '  1. Verify the chatflow ID is correct');
+        addLog('info', '  2. Check if the chatflow is published/active');
+        addLog('info', '  3. Verify the endpoint URL format');
+      }
+      
       return null;
     }
-  }, [flowiseEndpoint, imageAnalysis, signalData, addLog]);
+  }, [flowiseEndpoint, imageAnalysis, signalData, addLog, extractFlowiseContent]);
 
   const runClassification = useCallback(async () => {
     if (!imageAnalysis || !signalData || hasStarted) return;
@@ -129,6 +242,31 @@ export default function QualityClassificationStep({
 
     // Try Flowise API first
     const flowiseResponse = await callFlowiseAPI();
+
+    if (flowiseResponse) {
+      // Try to parse the classification from Flowise response
+      const parsedClassification = parseClassificationFromText(flowiseResponse);
+      
+      if (parsedClassification) {
+        addLog('success', `✓ Flowise classification received`);
+        addLog('success', `Classification complete: Grade ${parsedClassification.grade} (${parsedClassification.score}/100)`);
+        addLog('info', `Visual Factor: ${parsedClassification.factors.visual}%`);
+        addLog('info', `Chemical Factor: ${parsedClassification.factors.chemical}%`);
+        addLog('info', `Storage Factor: ${parsedClassification.factors.storage}%`);
+
+        setResult(parsedClassification);
+        setIsProcessing(false);
+        
+        // Salva l'output nella memoria condivisa
+        agentMemoryService.setClassification(parsedClassification);
+        addLog('info', 'Output saved to shared memory for downstream agents');
+        
+        onComplete(parsedClassification);
+        return;
+      } else {
+        addLog('warning', 'Flowise responded but could not parse classification. Using fallback...');
+      }
+    }
 
     if (!flowiseResponse) {
       // Fallback to mock classification
@@ -201,7 +339,7 @@ export default function QualityClassificationStep({
     addLog('info', 'Output saved to shared memory for downstream agents');
     
     onComplete(mockResult);
-  }, [imageAnalysis, signalData, hasStarted, addLog, callFlowiseAPI, onComplete]);
+  }, [imageAnalysis, signalData, hasStarted, addLog, callFlowiseAPI, onComplete, parseClassificationFromText]);
 
   useEffect(() => {
     if (isActive && imageAnalysis && signalData && !hasStarted) {

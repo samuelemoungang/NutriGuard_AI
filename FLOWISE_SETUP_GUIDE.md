@@ -87,8 +87,16 @@ Agent 4 (Final Feedback) → Flowise API
 **1. HTTP Request Node (Input)**
 - **Type**: POST
 - **URL**: `/api/v1/prediction/{chatflowId}`
-- **Headers**: `Content-Type: application/json`
+- **Headers** (dans Flowise, ajoutez un header avec):
+  - **Key**: `Content-Type`
+  - **Value**: `application/json`
 - Ce nœud recevra le payload du frontend
+
+**Note**: Si Flowise vous demande de configurer les headers dans un tableau/objet, ajoutez:
+```
+Key: Content-Type
+Value: application/json
+```
 
 **2. Set Variables Node**
 Extrait les données de `overrideConfig`:
