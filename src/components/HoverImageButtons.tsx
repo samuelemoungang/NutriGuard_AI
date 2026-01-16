@@ -45,12 +45,12 @@ const defaultButtons: HoverImageButton[] = [
   // 5 BOTTONI A SINISTRA (allineati verticalmente)
   {
     id: 'hover-btn-1',
-    imageUrl: '/images/hover-1.jpg', // Immagine Getting Started with Roboflow
+    imageUrl: '/images/Flowchart du projet.png', // Immagine Getting Started with Roboflow
     position: { top: '10%', left: '3%' },
   },
   {
     id: 'hover-btn-2',
-    imageUrl: '/images/hover-2.jpg', // Immagine Flowchart Roboflow YOLOv
+    imageUrl: '/images/Logos.png', // Immagine Flowchart Roboflow YOLOv
     position: { top: '25%', left: '3%' },
   },
   {
