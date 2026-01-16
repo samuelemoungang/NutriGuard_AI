@@ -50,28 +50,28 @@ const defaultButtons: HoverImageButton[] = [
   },
   {
     id: 'hover-btn-2',
-    imageUrl: '/images/Entrypage_FLOWISE.png', // Immagine Flowchart Roboflow YOLOv
+    imageUrl: '/images/hover-2.jpg', // Immagine Flowchart Roboflow YOLOv
     position: { top: '25%', left: '3%' },
   },
   {
     id: 'hover-btn-3',
-    imageUrl: '/images/Flowchart Roboflow YOLOv8.png', // Immagine Code of Signal Processing
+    imageUrl: '/images/Entrypage_FLOWISE.png', // Immagine Code of Signal Processing
     position: { top: '40%', left: '3%' },
   },
   {
     id: 'hover-btn-4',
-    imageUrl: '/images/Code of SignalProcessing.png', // 👈 CAMBIA QUESTO
+    imageUrl: '/images/Flowchart Roboflow YOLOv8.png', // 👈 CAMBIA QUESTO
     position: { top: '55%', left: '3%' },
   },
   {
     id: 'hover-btn-5',
-    imageUrl: '/images/Quality classification Agent.png', // 👈 CAMBIA QUESTO
+    imageUrl: '/images/Code of SignalProcessing.png', // 👈 CAMBIA QUESTO
     position: { top: '70%', left: '3%' },
   },
   // 5 BOTTONI A DESTRA (allineati verticalmente)
   {
     id: 'hover-btn-6',
-    imageUrl: '/images/hover-6.jpg', // 👈 CAMBIA QUESTO
+    imageUrl: '/images/Quality classification Agent.png', // 👈 CAMBIA QUESTO
     position: { top: '10%', right: '3%' },
   },
   {
