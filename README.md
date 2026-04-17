@@ -202,7 +202,7 @@ The project demonstrates how AI can address real-world life-science challenges, 
 ## 📄 License
 
 Private academic project — HES-SO Valais-Wallis, 2026.
-
+Project created by Samuele Moungang Moussandja and Olivia Kaloa Farias Melo
 ---
 
 *Built with ❤️ in Valais, Switzerland.*
